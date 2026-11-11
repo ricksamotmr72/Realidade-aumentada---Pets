@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ff7a59">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pets AR">
+<link rel="apple-touch-icon" href="assets/icone.png">
+<link rel="manifest" href="manifest.json">
+<title>Meus Pets em Realidade Aumentada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --laranja:#ff7a59; --amarelo:#ffd23f; --verde:#3bceac; --azul:#3a86ff; --rosa:#ff5d8f; --roxo:#8338ec;
+    --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none}
+  html,body{margin:0; height:100%; overflow:hidden; background:#000; font-family:"Baloo 2", "Comic Sans MS", system-ui, sans-serif; color:#fff; touch-action:none; overscroll-behavior:none}
+  button{font-family:inherit; cursor:pointer; border:0}
+  [hidden]{display:none !important}
+
+  /* ---------- Tela inicial ---------- */
+  #inicio{position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:24px; text-align:center;
+    background: radial-gradient(circle at 20% 15%, #ffe066 0 12%, transparent 13%), radial-gradient(circle at 85% 80%, #ffb3c6 0 14%, transparent 15%), linear-gradient(160deg, #6a4cff, #3a86ff 45%, #3bceac);
+    overflow:hidden}
+  #inicio h1{margin:0; font-size:clamp(34px, 9vw, 64px); line-height:1; text-shadow:0 5px 0 rgba(0,0,0,.18); font-weight:800}
+  #inicio p{margin:0; font-size:clamp(17px, 4.5vw, 24px); max-width:520px; opacity:.95}
+  .flutuantes{position:absolute; inset:0; pointer-events:none}
+  .flutuantes img{position:absolute; width:22vmin; max-width:150px; filter:drop-shadow(0 8px 10px rgba(0,0,0,.25)); animation:flutuar 4s ease-in-out infinite}
+  @keyframes flutuar{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-18px) rotate(6deg)}}
+  .conteudo-inicio{position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:18px}
+  .btn-grande{background:var(--amarelo); color:#4a2a00; font-size:clamp(24px, 6vw, 34px); font-weight:800; padding:16px 42px; border-radius:999px;
+    box-shadow:0 8px 0 #d9a600, 0 14px 30px rgba(0,0,0,.25); transition:transform .1s; animation:pulsar 1.6s ease-in-out infinite}
+  .btn-grande:active{transform:translateY(6px); box-shadow:0 2px 0 #d9a600}
+  @keyframes pulsar{0%,100%{scale:1}50%{scale:1.06}}
+  .aviso{font-size:15px !important; background:rgba(0,0,0,.25); padding:10px 16px; border-radius:16px}
+
+  /* ---------- Palco AR ---------- */
+  #palco{position:fixed; inset:0; overflow:hidden; background: linear-gradient(#8fd3ff, #c9f0ff 55%, #8be08b 56%, #5cbf5c)}
+  #video{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+  #video.espelho{transform:scaleX(-1)}
+  #camada-pets{position:absolute; inset:0}
+  .pet{position:absolute; left:0; top:0; transform-origin:50% 100%; touch-action:none; will-change:transform}
+  .pet img{position:absolute; left:0; bottom:0; width:100%; height:100%; transform-origin:50% 100%; pointer-events:none;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,.25))}
+  .pet .sombra{position:absolute; left:12.5%; width:75%; border-radius:50%; pointer-events:none;
+    background:radial-gradient(ellipse at center, rgba(0,0,0,.45) 0%, rgba(0,0,0,.18) 45%, rgba(0,0,0,0) 70%)}
+  .particula{position:absolute; left:0; top:0; font-size:34px; pointer-events:none; z-index:20; animation:subir 1.2s ease-out forwards}
+  @keyframes subir{0%{opacity:0; transform:translate(var(--x0),var(--y0)) scale(.4)}15%{opacity:1}100%{opacity:0; transform:translate(var(--x1),var(--y1)) scale(1.2) rotate(var(--r))}}
+
+  /* ---------- Interface ---------- */
+  .barra-topo{position:absolute; top:calc(10px + var(--safe-top)); left:10px; right:10px; display:flex; justify-content:space-between; align-items:center; gap:8px; z-index:30; pointer-events:none}
+  .barra-topo > *{pointer-events:auto}
+  .logo{background:rgba(255,255,255,.9); color:#5a2ca0; font-weight:800; font-size:18px; padding:6px 14px; border-radius:999px; box-shadow:0 4px 12px rgba(0,0,0,.2)}
+  .grupo-botoes{display:flex; gap:8px}
+  .btn-redondo{width:48px; height:48px; border-radius:50%; background:rgba(255,255,255,.92); font-size:24px; display:grid; place-items:center; box-shadow:0 4px 12px rgba(0,0,0,.25); transition:transform .1s}
+  .btn-redondo:active{transform:scale(.88)}
+  .btn-redondo.desligado{opacity:.5}
+  @media (max-width:400px){ .logo{display:none} .barra-topo{justify-content:flex-end} .btn-redondo{width:44px; height:44px; font-size:22px} }
+  img{-webkit-touch-callout:none; -webkit-user-drag:none}
+  #previa img{-webkit-touch-callout:default}
+
+  .rodape{position:absolute; left:0; right:0; bottom:0; z-index:30; padding-bottom:calc(8px + var(--safe-bottom));
+    background:linear-gradient(transparent, rgba(0,0,0,.45))}
+
+  /* interface "dorme" (fica quase transparente) quando ninguém mexe nela */
+  .barra-topo, .rodape, #banner{transition:opacity .6s ease, background .6s ease}
+  #palco.ocioso .barra-topo, #palco.ocioso .rodape, #palco.ocioso #banner{opacity:.18}
+  #palco.ocioso .rodape{background:transparent}
+  .acoes{display:flex; justify-content:center; align-items:center; gap:22px; margin-bottom:8px}
+  .btn-foto{width:76px; height:76px; border-radius:50%; background:#fff; border:6px solid var(--rosa); font-size:34px; box-shadow:0 6px 18px rgba(0,0,0,.35); transition:transform .1s}
+  .btn-foto:active{transform:scale(.88)}
+  .btn-acao{height:52px; padding:0 16px; border-radius:999px; background:var(--amarelo); color:#4a2a00; font-size:18px; font-weight:800; box-shadow:0 5px 0 #d9a600, 0 8px 18px rgba(0,0,0,.3)}
+  .btn-acao:active{transform:translateY(4px); box-shadow:0 1px 0 #d9a600}
+  .btn-acao.verde{background:var(--verde); color:#063b2e; box-shadow:0 5px 0 #2a9c82, 0 8px 18px rgba(0,0,0,.3)}
+
+  /* grade de seleção: todos os bichinhos sempre visíveis (tamanho calculado em ajustarCards) */
+  .carrossel{--card:84px; --cols:8; --gap:8px; display:grid; grid-template-columns:repeat(var(--cols), var(--card)); justify-content:center; gap:var(--gap); padding:6px 12px 4px}
+  .miniatura{width:var(--card); height:calc(var(--card) * 1.15); border-radius:calc(var(--card) * .22); background:rgba(255,255,255,.92); padding:calc(var(--card) * .05);
+    display:flex; flex-direction:column; align-items:center; justify-content:space-between;
+    box-shadow:0 3px 8px rgba(0,0,0,.25); border:3px solid transparent; transition:transform .12s}
+  .miniatura:active{transform:scale(.9)}
+  .miniatura.ativa{border-color:var(--rosa)}
+  .miniatura img{width:100%; height:calc(var(--card) * .74); object-fit:contain; pointer-events:none}
+  .miniatura span{font-size:calc(var(--card) * .15); font-weight:700; color:#5a2ca0; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+  /* cards pequenos: só a figura, ocupando o card todo */
+  .carrossel.compacto .miniatura{height:var(--card); justify-content:center}
+  .carrossel.compacto .miniatura img{height:100%}
+  .carrossel.compacto .miniatura span{display:none}
+
+  #dica{position:absolute; left:50%; top:calc(72px + var(--safe-top)); transform:translateX(-50%); z-index:31; background:rgba(255,255,255,.95); color:#5a2ca0; font-weight:700; font-size:17px;
+    padding:10px 18px; border-radius:20px; box-shadow:0 6px 18px rgba(0,0,0,.25); width:max-content; max-width:90vw; text-align:center; transition:opacity .4s; pointer-events:none}
+  #dica.some{opacity:0}
+
+  #lixeira{position:absolute; left:50%; top:calc(70px + var(--safe-top)); transform:translateX(-50%) scale(.6); width:84px; height:84px; border-radius:50%; background:rgba(255,60,60,.85); display:grid; place-items:center;
+    font-size:40px; z-index:29; opacity:0; transition:opacity .2s, transform .2s; pointer-events:none}
+  #lixeira.visivel{opacity:1; transform:translateX(-50%) scale(1)}
+  #lixeira.em-cima{transform:translateX(-50%) scale(1.3); background:#ff2020}
+
+  #flash{position:fixed; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:60; transition:opacity .35s}
+  #flash.on{opacity:1; transition:none}
+
+  #previa{position:fixed; inset:0; z-index:70; background:rgba(20,10,40,.85); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:20px}
+  #previa img{max-width:92vw; max-height:68vh; border-radius:18px; border:6px solid #fff; box-shadow:0 10px 30px rgba(0,0,0,.5); transform:rotate(-2deg)}
+  #previa .linha{display:flex; gap:12px; flex-wrap:wrap; justify-content:center}
+
+  #banner{position:absolute; left:12px; right:12px; top:calc(70px + var(--safe-top)); z-index:32; background:#fff3cd; color:#664d03; border-radius:16px; padding:10px 14px; font-size:15px; text-align:center; box-shadow:0 6px 18px rgba(0,0,0,.2)}
+
+  /* ---------- Overlay do modo WebXR ---------- */
+  #xr-overlay{position:fixed; inset:0; z-index:80; pointer-events:none}
+  #xr-overlay .xr-ui{pointer-events:auto}
+  #xr-dica{position:absolute; top:calc(16px + var(--safe-top)); left:50%; transform:translateX(-50%); background:rgba(255,255,255,.95); color:#5a2ca0; font-weight:700; font-size:17px; padding:10px 18px; border-radius:20px; width:max-content; max-width:80vw; text-align:center}
+  #xr-sair{position:absolute; top:calc(12px + var(--safe-top)); right:12px}
+  #xr-rodape{position:absolute; left:0; right:0; bottom:0; padding-bottom:calc(10px + var(--safe-bottom))}
+
+  /* ---------- iPad / tablets ---------- */
+  @media (min-width:700px) and (min-height:700px), (min-width:1000px) and (min-height:600px){
+    .barra-topo{top:calc(18px + var(--safe-top)); left:20px; right:20px}
+    .logo{font-size:24px; padding:8px 20px}
+    .grupo-botoes{gap:12px}
+    .btn-redondo{width:64px; height:64px; font-size:32px}
+    .acoes{gap:30px; margin-bottom:10px}
+    .btn-foto{width:88px; height:88px; font-size:40px; border-width:7px}
+    .btn-acao{height:58px; padding:0 22px; font-size:21px}
+    .carrossel{padding:8px 24px 6px}
+    .miniatura{border-width:4px}
+    #dica{top:calc(100px + var(--safe-top)); font-size:22px; padding:14px 26px; border-radius:26px}
+    #lixeira{top:calc(100px + var(--safe-top)); width:110px; height:110px; font-size:54px}
+    #banner{top:calc(100px + var(--safe-top)); font-size:19px; left:15%; right:15%}
+    .particula{font-size:46px}
+    .rodape{padding-bottom:calc(16px + var(--safe-bottom))}
+    #xr-dica{font-size:22px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ======= TELA INICIAL ======= -->
+<section id="inicio">
+  <div class="flutuantes" id="flutuantes"></div>
+  <div class="conteudo-inicio">
+    <h1>🐾 Meus Pets<br>na Câmera!</h1>
+    <p>Aponte a câmera para o chão, para a mesa ou para você e veja os bichinhos aparecerem de verdade!</p>
+    <button class="btn-grande" id="btn-comecar">▶ Começar</button>
+    <p class="aviso" id="aviso-https" hidden></p>
+  </div>
+</section>
+
+<!-- ======= PALCO AR ======= -->
+<main id="palco" hidden>
+  <video id="video" playsinline muted autoplay></video>
+  <div id="camada-pets"></div>
+
+  <div class="barra-topo">
+    <div class="logo">🐾 Pets AR</div>
+    <div class="grupo-botoes">
+      <button class="btn-redondo" id="btn-som" title="Som">🔊</button>
+      <button class="btn-redondo" id="btn-fixar" title="Fixar bichinhos no ambiente" hidden>📌</button>
+      <button class="btn-redondo" id="btn-trocar" title="Trocar câmera">🔄</button>
+      <button class="btn-redondo" id="btn-limpar" title="Tirar todos">🧹</button>
+      <button class="btn-redondo" id="btn-telacheia" title="Tela cheia" hidden>⛶</button>
+    </div>
+  </div>
+
+  <div id="banner" hidden></div>
+  <div id="dica">👇 Escolha um bichinho lá embaixo!</div>
+  <div id="lixeira">🗑️</div>
+
+  <div class="rodape">
+    <div class="acoes">
+      <button class="btn-acao" id="btn-festa">🎉 Festa!</button>
+      <button class="btn-foto" id="btn-foto" title="Tirar foto">📸</button>
+      <button class="btn-acao verde" id="btn-xr" hidden>🌍 No chão</button>
+    </div>
+    <div class="carrossel" id="carrossel"></div>
+  </div>
+</main>
+
+<div id="flash"></div>
+
+<section id="previa" hidden>
+  <img id="previa-img" alt="Foto com os pets">
+  <div class="linha">
+    <button class="btn-acao verde" id="btn-salvar">💾 Salvar</button>
+    <button class="btn-acao" id="btn-compartilhar" hidden>📤 Enviar</button>
+    <button class="btn-acao" id="btn-fechar" style="background:#fff; box-shadow:0 5px 0 #ccc">✖ Voltar</button>
+  </div>
+</section>
+
+<!-- ======= OVERLAY WEBXR (Android/Chrome) ======= -->
+<div id="xr-overlay" hidden>
+  <div id="xr-dica">Mexa o celular devagar para achar o chão… 👀</div>
+  <button class="btn-redondo xr-ui" id="xr-sair" title="Sair">✖</button>
+  <div id="xr-rodape" class="xr-ui">
+    <div class="carrossel" id="xr-carrossel"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   LISTA DE BICHINHOS (pasta assets/pets, geradas a partir de IMG/)
+   ========================================================= */
+const PETS = [
+  { id:'coelho',       nome:'Coelho',   tipo:'coelho' },
+  { id:'coelho-1',     nome:'Coelho',   tipo:'coelho' },
+  { id:'coelho-3',     nome:'Coelho',   tipo:'coelho' },
+  { id:'cachorro',     nome:'Cachorro', tipo:'cao' },
+  { id:'cao-azul',     nome:'Cachorro', tipo:'cao' },
+  { id:'cao-colorido', nome:'Cachorro', tipo:'cao' },
+  { id:'cao-robo',     nome:'Robô',     tipo:'robo' },
+  { id:'cavalo',       nome:'Cavalo',   tipo:'cavalo' },
+  { id:'cavalo2',      nome:'Cavalo',   tipo:'cavalo' },
+  { id:'gato-1',       nome:'Gato',     tipo:'gato' },
+  { id:'gato-2',       nome:'Gato',     tipo:'gato' },
+  { id:'gato-3',       nome:'Gato',     tipo:'gato' },
+  { id:'gato-4',       nome:'Gato',     tipo:'gato' },
+  { id:'gato-5',       nome:'Gato',     tipo:'gato' },
+  { id:'gato-6',       nome:'Gato',     tipo:'gato' },
+];
+const img  = p => `assets/pets/${p.id}.png`;
+const mini = p => `assets/pets/thumbs/${p.id}.png`;
+
+const PARTICULAS = { coelho:['🥕','💖','✨'], cao:['🦴','💛','⭐'], robo:['⚡','🔩','💙'], cavalo:['🥕','🌾','💚'],
+                     gato:['🐟','💜','🧶'] };
+
+/* =========================================================
+   ELEMENTOS & ESTADO
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const palco = $('#palco'), video = $('#video'), camada = $('#camada-pets');
+const dica = $('#dica'), lixeira = $('#lixeira'), banner = $('#banner');
+
+const estado = {
+  pets: [], zTopo: 10, somLigado: true, camera: 'environment', stream: null,
+  fixar: true, temGiro: false, giro: { yaw0:null, pitch0:0, yaw:0, pitch:0, ox:0, oy:0 },
+  festaAte: 0, petXR: PETS[0],
+};
+const MAX_PETS = 8;
+let audioCtx = null;
+
+/* =========================================================
+   TELA INICIAL
+   ========================================================= */
+(function montarInicio(){
+  const box = $('#flutuantes');
+  const pos = [[4,6],[70,4],[2,62],[74,66],[38,78],[80,34]];
+  pos.forEach(([l,t], i) => {
+    const p = PETS[(i*3) % PETS.length];
+    const el = document.createElement('img');
+    el.src = mini(p); el.alt = '';
+    el.style.left = l+'%'; el.style.top = t+'%'; el.style.animationDelay = (i*-0.7)+'s';
+    box.appendChild(el);
+  });
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    const a = $('#aviso-https'); a.hidden = false;
+    a.textContent = '⚠️ Para usar a câmera, abra esta página por um link https:// (ou localhost). Mesmo assim dá para brincar sem câmera!';
+  }
+})();
+
+/* ---------- Tela cheia (iPad, Android e computador; iPhone não permite) ---------- */
+const raiz = document.documentElement;
+const podeTelaCheia = !!(raiz.requestFullscreen || raiz.webkitRequestFullscreen);
+const emTelaCheia = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+function entrarTelaCheia(){
+  if (!podeTelaCheia || emTelaCheia()) return;
+  try {
+    const r = raiz.requestFullscreen ? raiz.requestFullscreen({ navigationUI:'hide' }) : raiz.webkitRequestFullscreen();
+    r?.catch?.(() => {});
+  } catch {}
+}
+function sairTelaCheia(){
+  try { (document.exitFullscreen || document.webkitExitFullscreen).call(document)?.catch?.(() => {}); } catch {}
+}
+function atualizarBotaoTelaCheia(){
+  const b = $('#btn-telacheia');
+  b.hidden = !podeTelaCheia;
+  b.textContent = emTelaCheia() ? '🗗' : '⛶';
+}
+document.addEventListener('fullscreenchange', atualizarBotaoTelaCheia);
+document.addEventListener('webkitfullscreenchange', atualizarBotaoTelaCheia);
+
+$('#btn-comecar').addEventListener('click', async () => {
+  // Tudo isto precisa acontecer direto no toque (regra do Safari): tela cheia, áudio e giroscópio
+  entrarTelaCheia();
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' }); prepararSom(); } catch {}
+  await pedirGiroscopio();
+  atualizarBotaoTelaCheia();
+  $('#inicio').hidden = true; palco.hidden = false;
+  montarCarrossel($('#carrossel'), adicionarPet);
+  iniciarCamera(estado.camera);
+  verificarWebXR();
+  requestAnimationFrame(loop);
+  mostrarDica('👇 Toque em um bichinho para ele aparecer!', 5000);
+  acordarInterface();
+});
+
+/* =========================================================
+   CÂMERA
+   ========================================================= */
+async function iniciarCamera(modo){
+  pararCamera();
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    erroCamera(`Esta página foi aberta por um endereço sem segurança (${location.protocol}//${location.host || 'arquivo'}). ` +
+      'O navegador só libera a câmera em links https:// ou em localhost.');
+    return;
+  }
+  // tenta do pedido mais específico para o mais simples (alguns aparelhos/webcams recusam restrições)
+  const tentativas = [
+    telaGrande()
+      ? { facingMode:{ ideal:modo }, width:{ ideal:1920 }, height:{ ideal:1080 } }   // iPad/tablet: imagem nítida
+      : { facingMode:{ ideal:modo }, width:{ ideal:1280 }, height:{ ideal:720 } },
+    { facingMode:{ ideal:modo } },
+    true,
+  ];
+  let ultimoErro = null;
+  for (const v of tentativas) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio:false, video:v });
+      estado.stream = stream;
+      video.srcObject = stream;
+      video.classList.toggle('espelho', modo === 'user');
+      await tocarVideo();
+      banner.hidden = true;
+      atualizarBotaoFixar();
+      return;
+    } catch (e) {
+      ultimoErro = e; console.warn('Câmera:', e.name, e.message);
+      if (e.name === 'NotAllowedError' || e.name === 'SecurityError') break; // permissão negada: não adianta insistir
+    }
+  }
+  erroCamera(explicarErro(ultimoErro));
+  atualizarBotaoFixar();
+}
+async function tocarVideo(){
+  if (video.readyState < 1) await new Promise(ok => { video.onloadedmetadata = ok; setTimeout(ok, 3000); });
+  try { await video.play(); }
+  catch {
+    // alguns navegadores exigem um toque para iniciar o vídeo
+    mostrarDica('👆 Toque na tela para ligar a câmera', 4000);
+    palco.addEventListener('pointerdown', () => video.play().catch(()=>{}), { once:true });
+  }
+}
+function explicarErro(e){
+  const n = e?.name || '';
+  if (n === 'NotAllowedError' || n === 'SecurityError')
+    return 'A câmera foi bloqueada. Toque no cadeado 🔒 ao lado do endereço do site, permita a Câmera e recarregue a página. ' +
+           'No computador, confira também em Windows > Configurações > Privacidade > Câmera se o navegador tem permissão.';
+  if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError')
+    return 'A câmera está ocupada ou bloqueada pelo sistema. Feche outros apps que usam a câmera (Teams, Zoom, WhatsApp, outra aba) e tente de novo.';
+  if (n === 'NotFoundError' || n === 'DevicesNotFoundError' || n === 'OverconstrainedError')
+    return 'Nenhuma câmera foi encontrada neste aparelho.';
+  return `Não consegui abrir a câmera (${n || 'erro desconhecido'}${e?.message ? ': ' + e.message : ''}).`;
+}
+function erroCamera(msg){
+  banner.innerHTML = '';
+  const p = document.createElement('div'); p.textContent = '📷 ' + msg + ' Enquanto isso, dá para brincar no cenário de desenho!';
+  const b = document.createElement('button'); b.className = 'btn-acao verde'; b.textContent = '🔄 Tentar de novo';
+  b.style.cssText = 'margin-top:8px; height:40px; font-size:16px';
+  b.onclick = () => iniciarCamera(estado.camera);
+  banner.append(p, b); banner.hidden = false;
+}
+function pararCamera(){
+  estado.stream?.getTracks().forEach(t => t.stop());
+  estado.stream = null; video.srcObject = null;
+}
+$('#btn-trocar').addEventListener('click', () => {
+  estado.camera = estado.camera === 'environment' ? 'user' : 'environment';
+  estado.giro.yaw0 = null;
+  iniciarCamera(estado.camera);
+  mostrarDica(estado.camera === 'user' ? '🤳 Modo selfie! Tire uma foto com os bichinhos!' : '📷 Câmera de trás!', 2500);
+});
+function mostrarBanner(txt){ banner.textContent = txt; banner.hidden = false; setTimeout(()=> banner.hidden = true, 7000); }
+// se a criança voltar para a aba e a câmera tiver sido desligada pelo sistema, religa
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !palco.hidden && $('#xr-overlay').hidden &&
+      (!estado.stream || estado.stream.getVideoTracks().every(t => t.readyState === 'ended'))) iniciarCamera(estado.camera);
+});
+
+/* =========================================================
+   GIROSCÓPIO: faz os bichinhos ficarem "parados" no ambiente
+   quando o celular gira (câmera traseira)
+   ========================================================= */
+async function pedirGiroscopio(){
+  if (typeof DeviceOrientationEvent === 'undefined') return;
+  try {
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== 'granted') return;
+    }
+    window.addEventListener('deviceorientation', aoGirar);
+  } catch {}
+}
+function aoGirar(e){
+  if (e.alpha == null || e.beta == null) return;
+  const r = Math.PI/180, a = e.alpha*r, b = e.beta*r, g = (e.gamma||0)*r;
+  const ca=Math.cos(a), sa=Math.sin(a), cb=Math.cos(b), sb=Math.sin(b), cg=Math.cos(g), sg=Math.sin(g);
+  // direção para onde a câmera traseira aponta (coordenadas do mundo: x leste, y norte, z cima)
+  const fx = -ca*sg - sa*sb*cg, fy = -sa*sg + ca*sb*cg, fz = -cb*cg;
+  const yaw = Math.atan2(fx, fy), pitch = Math.asin(Math.max(-1, Math.min(1, fz)));
+  const G = estado.giro;
+  if (!estado.temGiro) { estado.temGiro = true; atualizarBotaoFixar(); }
+  if (G.yaw0 === null) { G.yaw0 = yaw; G.pitch0 = pitch; }
+  G.yaw = yaw; G.pitch = pitch;
+}
+function atualizarBotaoFixar(){
+  $('#btn-fixar').hidden = !estado.temGiro || estado.camera === 'user';
+  $('#btn-fixar').classList.toggle('desligado', !estado.fixar);
+}
+$('#btn-fixar').addEventListener('click', () => {
+  estado.fixar = !estado.fixar; estado.giro.yaw0 = null;
+  // ao ligar/desligar, recalcula para os bichinhos não "pularem" na tela
+  estado.pets.forEach(p => { p.x += estado.giro.ox; p.y += estado.giro.oy; });
+  estado.giro.ox = estado.giro.oy = 0;
+  atualizarBotaoFixar();
+  mostrarDica(estado.fixar ? '📌 Bichinhos presos no lugar: gire o celular e veja!' : '📌 Bichinhos andam junto com a tela', 2500);
+});
+function calcularDeslocamento(){
+  const G = estado.giro;
+  let alvoX = 0, alvoY = 0;
+  if (estado.fixar && estado.temGiro && estado.camera === 'environment' && G.yaw0 !== null) {
+    let dy = G.yaw - G.yaw0; while (dy > Math.PI) dy -= 2*Math.PI; while (dy < -Math.PI) dy += 2*Math.PI;
+    const k = Math.max(innerWidth, innerHeight) / (65*Math.PI/180); // pixels por radiano (≈ campo de visão)
+    alvoX = -dy * k; alvoY = (G.pitch - G.pitch0) * k;
+  }
+  G.ox += (alvoX - G.ox) * 0.35; G.oy += (alvoY - G.oy) * 0.35; // suaviza tremidas
+}
+
+/* =========================================================
+   CARROSSEL
+   ========================================================= */
+function montarCarrossel(container, aoEscolher){
+  container.innerHTML = '';
+  PETS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'miniatura'; b.dataset.id = p.id;
+    b.innerHTML = `<img src="${mini(p)}" alt="${p.nome}" loading="lazy"><span>${p.nome}</span>`;
+    b.addEventListener('click', () => {
+      container.querySelectorAll('.miniatura').forEach(m => m.classList.toggle('ativa', m === b));
+      aoEscolher(p);
+    });
+    container.appendChild(b);
+  });
+  ajustarCards(container);
+}
+
+// Escolhe linhas/colunas e tamanho dos cards para que TODOS caibam na tela, sem rolar.
+// Testa 1, 2, 3… linhas e fica com a opção que deixa o card maior.
+function ajustarCards(container){
+  const N = PETS.length;
+  const grande = telaGrande();
+  const pad = grande ? 48 : 24;
+  const larg = Math.min(container.clientWidth || innerWidth, innerWidth) - pad;
+  const altMax = innerHeight * (grande ? 0.15 : 0.22); // limite de altura da grade (iPad: ~15% da tela)
+  const gap = grande ? 10 : 8, cardMax = grande ? 96 : 80, cardMin = 34;
+  let melhor = { linhas:1, cols:N, card:cardMin };
+  for (let linhas = 1; linhas <= 5; linhas++) {
+    const cols = Math.ceil(N / linhas);
+    const pelaLargura = (larg - gap*(cols-1)) / cols;
+    const pelaAltura  = (altMax - gap*(linhas-1)) / (linhas * 1.15);
+    const card = Math.floor(Math.min(cardMax, pelaLargura, pelaAltura));
+    if (card > melhor.card) melhor = { linhas, cols, card };
+  }
+  container.style.setProperty('--cols', melhor.cols);
+  container.style.setProperty('--card', melhor.card + 'px');
+  container.style.setProperty('--gap', gap + 'px');
+  container.classList.toggle('compacto', melhor.card < 66);   // pequeno demais para o nome: mostra só a figura
+}
+addEventListener('resize', () => document.querySelectorAll('.carrossel').forEach(ajustarCards));
+
+/* =========================================================
+   BICHINHOS NA TELA
+   ========================================================= */
+function telaGrande(){ return Math.min(innerWidth, innerHeight) >= 700; }
+function tamanhoBase(){ return Math.min(innerHeight * 0.34, innerWidth * 0.6, telaGrande() ? 440 : 340); }
+
+$('#btn-telacheia').addEventListener('click', () => emTelaCheia() ? sairTelaCheia() : entrarTelaCheia());
+
+/* ---------- iPad / Safari: impede zoom da página, lupa e menu de "salvar imagem" ---------- */
+['gesturestart','gesturechange','gestureend'].forEach(ev => document.addEventListener(ev, e => e.preventDefault(), { passive:false }));
+let ultimoToqueFim = 0;
+document.addEventListener('touchend', e => {           // bloqueia o zoom de toque duplo
+  const agora = Date.now();
+  if (agora - ultimoToqueFim < 350 && e.target.closest('#palco') && !e.target.closest('button')) e.preventDefault();
+  ultimoToqueFim = agora;
+}, { passive:false });
+// sem menu de toque longo, exceto na foto pronta (lá é útil para "Salvar nas Fotos")
+document.addEventListener('contextmenu', e => { if (!e.target.closest('#previa')) e.preventDefault(); });
+
+/* ---------- Girar o iPad: mantém os bichinhos dentro da tela ---------- */
+let larguraAnt = innerWidth, alturaAnt = innerHeight;
+function aoRedimensionar(){
+  const fx = innerWidth / larguraAnt, fy = innerHeight / alturaAnt;
+  for (const p of estado.pets) {
+    p.x = Math.max(40, Math.min(innerWidth - 40, (p.x + estado.giro.ox) * fx - estado.giro.ox));
+    p.y = Math.max(p.H * 0.4, Math.min(innerHeight - 40, (p.y + estado.giro.oy) * fy - estado.giro.oy));
+  }
+  larguraAnt = innerWidth; alturaAnt = innerHeight;
+  estado.giro.yaw0 = null;
+}
+addEventListener('resize', aoRedimensionar);
+
+/* ---------- Interface some (quase transparente) quando ninguém mexe ----------
+   - Depois de 4 s sem toques, botões e cards ficam bem clarinhos, liberando a tela.
+   - Brincar com os bichinhos NÃO acorda a interface (a tela continua livre).
+   - Tocar em qualquer outro lugar (fundo, botões, cards) faz tudo voltar.
+   - Os botões continuam funcionando mesmo clarinhos: um toque já escolhe o bichinho. */
+const TEMPO_OCIOSO = 4000;
+let timerOcioso;
+function acordarInterface(){
+  palco.classList.remove('ocioso');
+  clearTimeout(timerOcioso);
+  timerOcioso = setTimeout(adormecerInterface, TEMPO_OCIOSO);
+}
+function adormecerInterface(){
+  // só adormece se já houver bichinho na tela (antes disso a criança precisa ver os cards)
+  if (!estado.pets.length) { acordarInterface(); return; }
+  palco.classList.add('ocioso');
+  if (!adormecerInterface.avisou) { adormecerInterface.avisou = true; mostrarDica('👆 Toque no fundo da tela para ver os botões', 3500); }
+}
+palco.addEventListener('pointerdown', e => { if (!e.target.closest('.pet')) acordarInterface(); }, true);
+screen.orientation?.addEventListener?.('change', () => setTimeout(aoRedimensionar, 300));
+
+function adicionarPet(def){
+  if (estado.pets.length >= MAX_PETS) { mostrarDica('Já tem muitos bichinhos! Arraste um até a 🗑️', 2500); return; }
+  const imagem = new Image();
+  imagem.src = img(def);
+  imagem.onload = () => {
+    const H = tamanhoBase(), W = H * imagem.naturalWidth / imagem.naturalHeight;
+    const el = document.createElement('div'); el.className = 'pet';
+    el.style.width = W+'px'; el.style.height = H+'px'; el.style.marginLeft = (-W/2)+'px'; el.style.marginTop = (-H)+'px';
+    const sombra = document.createElement('div'); sombra.className = 'sombra';
+    sombra.style.height = (W*0.16)+'px'; sombra.style.bottom = (-W*0.08)+'px';
+    el.append(sombra, imagem);
+    camada.appendChild(el);
+    const n = estado.pets.length;
+    const p = {
+      def, el, img:imagem, sombra, W, H,
+      x: innerWidth/2 + (n%2 ? 1 : -1) * Math.min(n,3) * innerWidth*0.12 - estado.giro.ox,
+      y: Math.min(innerHeight*0.66, $('.rodape').getBoundingClientRect().top - 24) + (n%3)*14 - estado.giro.oy,
+      escala:1, rot:0, vira:1, fase:Math.random()*10, nasceu:performance.now(), pulo:0, r:{},
+    };
+    el.style.zIndex = ++estado.zTopo;
+    estado.pets.push(p);
+    ligarGestos(p);
+    tocar('pop');
+    soltarParticulas(p, 6);
+    if (estado.pets.length === 1) mostrarDica('👆 Arraste para mover • 🤏 Dois dedos para aumentar e girar • Toque para pular!', 6000);
+  };
+}
+
+function removerPet(p){
+  p.el.animate([{opacity:1, scale:1},{opacity:0, scale:.2}], {duration:250}).onfinish = () => p.el.remove();
+  estado.pets = estado.pets.filter(q => q !== p);
+  tocar('tchau');
+}
+$('#btn-limpar').addEventListener('click', () => { [...estado.pets].forEach(removerPet); });
+
+/* ---------- Gestos: arrastar, pinça, girar, tocar ---------- */
+function ligarGestos(p){
+  const toques = new Map();
+  let inicio = null, ultimoToque = 0;
+
+  const centro = () => { const v=[...toques.values()]; return { x:(v[0].x+(v[1]?.x??v[0].x))/2, y:(v[0].y+(v[1]?.y??v[0].y))/2 }; };
+  const dist  = () => { const [a,b]=[...toques.values()]; return Math.hypot(b.x-a.x, b.y-a.y); };
+  const ang   = () => { const [a,b]=[...toques.values()]; return Math.atan2(b.y-a.y, b.x-a.x); };
+
+  function recomecar(){
+    inicio = { c:centro(), x:p.x, y:p.y, escala:p.escala, rot:p.rot, d: toques.size>1?dist():0, a: toques.size>1?ang():0, t:inicio?.t ?? performance.now(), moveu:inicio?.moveu ?? false };
+  }
+  p.el.addEventListener('pointerdown', e => {
+    try { p.el.setPointerCapture(e.pointerId); } catch {}
+    toques.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    p.el.style.zIndex = ++estado.zTopo;
+    if (toques.size === 1) inicio = null;
+    recomecar();
+  });
+  p.el.addEventListener('pointermove', e => {
+    if (!toques.has(e.pointerId)) return;
+    toques.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    const c = centro();
+    if (Math.hypot(c.x-inicio.c.x, c.y-inicio.c.y) > 8 || toques.size > 1) inicio.moveu = true;
+    if (!inicio.moveu) return;
+    p.x = inicio.x + (c.x - inicio.c.x);
+    p.y = inicio.y + (c.y - inicio.c.y);
+    if (toques.size > 1 && inicio.d > 0) {
+      p.escala = Math.max(0.3, Math.min(3.5, inicio.escala * dist()/inicio.d));
+      p.rot = inicio.rot + (ang() - inicio.a);
+    }
+    lixeira.classList.add('visivel');
+    lixeira.classList.toggle('em-cima', toques.size === 1 && sobreLixeira(e));
+  });
+  const soltar = e => {
+    if (!toques.has(e.pointerId)) return;
+    const eraUnico = toques.size === 1;
+    toques.delete(e.pointerId);
+    if (eraUnico) {
+      lixeira.classList.remove('visivel','em-cima');
+      if (inicio.moveu && sobreLixeira(e)) { removerPet(p); return; }
+      if (!inicio.moveu && performance.now() - inicio.t < 400) {
+        const agora = performance.now();
+        if (agora - ultimoToque < 320) p.vira *= -1;   // toque duplo: vira de lado
+        ultimoToque = agora;
+        pular(p);
+      }
+    } else recomecar();
+  };
+  p.el.addEventListener('pointerup', soltar);
+  p.el.addEventListener('pointercancel', soltar);
+  p.el.addEventListener('wheel', e => { e.preventDefault(); p.escala = Math.max(0.3, Math.min(3.5, p.escala * (e.deltaY < 0 ? 1.08 : 0.92))); }, {passive:false});
+}
+function sobreLixeira(e){
+  const r = lixeira.getBoundingClientRect();
+  return Math.hypot(e.clientX - (r.left + r.width/2), e.clientY - (r.top + r.height/2)) < 70;
+}
+
+function pular(p){
+  p.pulo = performance.now();
+  tocar(p.def.tipo); soltarParticulas(p, 5);
+}
+
+/* ---------- Animação ---------- */
+function loop(){
+  const agora = performance.now();
+  calcularDeslocamento();
+  const festa = agora < estado.festaAte;
+  for (const p of estado.pets) {
+    const t = agora/1000 + p.fase;
+    let y = 0, sx = 1, sy = 1, gira = 0, sombra = 1;
+
+    // respiração / movimento parado
+    if (p.def.tipo === 'coelho') { const h = Math.max(0, Math.sin(t*3.2)); y = -h*h*p.H*0.06; }
+    sy = 1 + Math.sin(t*2.4)*0.025; sx = 1 - Math.sin(t*2.4)*0.015;
+    if (p.def.tipo === 'gato' || p.def.tipo === 'cavalo') gira = Math.sin(t*1.3)*0.03;
+
+    // pulo ao tocar
+    const dp = (agora - p.pulo) / 700;
+    if (dp >= 0 && dp < 1) {
+      y -= Math.sin(Math.PI*dp) * p.H * 0.45;
+      gira += Math.sin(Math.PI*2*dp) * 0.12;
+      if (dp < 0.12) { sy *= 1 - (0.12-dp)*1.5; sx *= 1 + (0.12-dp)*1.2; }
+      if (dp > 0.88) { sy *= 1 - (dp-0.88)*1.5; sx *= 1 + (dp-0.88)*1.2; }
+    }
+    // festa: todo mundo dança
+    if (festa) { y -= Math.abs(Math.sin(t*7)) * p.H*0.18; gira += Math.sin(t*7)*0.22; }
+
+    // aparecer com "pop"
+    const dn = Math.max(0, Math.min(1, (agora - p.nasceu)/450));
+    const pop = dn < 1 ? (1 - Math.pow(1-dn, 3)) * (1 + Math.sin(dn*Math.PI)*0.25) : 1;
+
+    sombra = Math.max(0.35, 1 + y/(p.H*0.6));
+    const X = p.x + estado.giro.ox, Y = p.y + estado.giro.oy, E = p.escala*pop;
+    p.r = { X, Y, E, y, sx: sx*p.vira, sy, gira, sombra };
+    p.el.style.transform = `translate(${X}px,${Y}px) rotate(${p.rot}rad) scale(${E})`;
+    p.img.style.transform = `translateY(${y}px) rotate(${gira}rad) scale(${sx*p.vira},${sy})`;
+    p.sombra.style.transform = `scale(${sombra})`;
+  }
+  requestAnimationFrame(loop);
+}
+
+function soltarParticulas(p, n){
+  const emojis = PARTICULAS[p.def.tipo] || ['✨'];
+  const cx = p.x + estado.giro.ox, cy = p.y + estado.giro.oy - p.H*p.escala*0.7;
+  for (let i=0;i<n;i++){
+    const s = document.createElement('div'); s.className = 'particula';
+    s.textContent = emojis[i % emojis.length];
+    const x0 = cx + (Math.random()-.5)*p.W*0.5, y0 = cy + (Math.random()-.5)*40;
+    s.style.setProperty('--x0', x0+'px'); s.style.setProperty('--y0', y0+'px');
+    s.style.setProperty('--x1', (x0 + (Math.random()-.5)*160)+'px'); s.style.setProperty('--y1', (y0 - 120 - Math.random()*120)+'px');
+    s.style.setProperty('--r', ((Math.random()-.5)*90)+'deg');
+    s.style.animationDelay = (i*60)+'ms';
+    palco.appendChild(s);
+    setTimeout(() => s.remove(), 1500 + i*60);
+  }
+}
+
+$('#btn-festa').addEventListener('click', () => {
+  if (!estado.pets.length) { mostrarDica('Coloque alguns bichinhos primeiro! 👇', 2500); return; }
+  estado.festaAte = performance.now() + 4000;
+  tocar('festa');
+  estado.pets.forEach((p,i) => setTimeout(() => soltarParticulas(p, 4), i*200));
+});
+
+/* =========================================================
+   EFEITOS SONOROS (sintetizados, sem arquivos)
+   Curtos, baixinhos e sem sobreposição: não atrapalham a brincadeira.
+   ========================================================= */
+let saidaSom = null, ultimoSom = 0;
+function prepararSom(){
+  if (!audioCtx) return false;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (!saidaSom) {
+    // volume geral baixo + compressor para nunca "estourar" com vários toques
+    const comp = audioCtx.createDynamicsCompressor(); comp.threshold.value = -24; comp.ratio.value = 6;
+    saidaSom = audioCtx.createGain(); saidaSom.gain.value = 0.55;
+    saidaSom.connect(comp).connect(audioCtx.destination);
+  }
+  return true;
+}
+// toca uma nota com curva de frequência: pontos = [[segundos, Hz], ...]
+function nota(pontos, { tipo='sine', vol=0.12, dur=0.2, atraso=0, filtro=0 } = {}){
+  const t = audioCtx.currentTime + atraso, o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = tipo;
+  pontos.forEach(([s, f], i) => i ? o.frequency.exponentialRampToValueAtTime(f, t+s) : o.frequency.setValueAtTime(f, t));
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t+0.015); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  let n = o;
+  if (filtro) { const f = audioCtx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filtro; n = o.connect(f); }
+  n.connect(g).connect(saidaSom); o.start(t); o.stop(t+dur+0.02);
+}
+const SONS = {
+  pop:    () => nota([[0,420],[0.07,950]], { vol:0.10, dur:0.1 }),                                     // bichinho aparece
+  tchau:  () => nota([[0,700],[0.15,260]], { vol:0.08, dur:0.17 }),                                    // bichinho sai
+  coelho: () => nota([[0,300],[0.1,760],[0.22,460]], { vol:0.11, dur:0.25 }),                          // boing
+  cao:    () => { nota([[0,520],[0.07,330]], { tipo:'triangle', vol:0.12, dur:0.09, filtro:1400 });    // au-au fofinho
+                  nota([[0,560],[0.07,350]], { tipo:'triangle', vol:0.10, dur:0.09, filtro:1400, atraso:0.13 }); },
+  gato:   () => nota([[0,620],[0.12,980],[0.32,560]], { tipo:'triangle', vol:0.09, dur:0.34, filtro:2200 }), // miau
+  cavalo: () => [0, 0.11, 0.26, 0.37].forEach((a,i) =>                                                 // pocotó
+                  nota([[0, i%2 ? 700 : 900],[0.04, 400]], { vol:0.12, dur:0.05, atraso:a })),
+  robo:   () => [880, 1320, 1100].forEach((f,i) => nota([[0,f]], { tipo:'square', vol:0.035, dur:0.06, atraso:i*0.08, filtro:3000 })),
+  foto:   () => { nota([[0,1800],[0.04,900]], { vol:0.07, dur:0.05 }); nota([[0,1200],[0.04,600]], { vol:0.06, dur:0.05, atraso:0.07 }); },
+  festa:  () => [523,659,784,1046,784,659,784,1046].forEach((f,i) =>                                   // xilofone
+                  nota([[0,f]], { tipo:'sine', vol:0.07, dur:0.18, atraso:i*0.18 })),
+};
+function tocar(nome){
+  if (!estado.somLigado || !prepararSom() || !SONS[nome]) return;
+  const agora = performance.now();
+  if (nome !== 'festa' && agora - ultimoSom < 110) return;   // evita amontoar sons com toques rápidos
+  ultimoSom = agora;
+  SONS[nome]();
+}
+$('#btn-som').addEventListener('click', e => {
+  estado.somLigado = !estado.somLigado;
+  e.currentTarget.textContent = estado.somLigado ? '🔊' : '🔇';
+  if (estado.somLigado) tocar('pop');
+});
+
+/* =========================================================
+   FOTO
+   ========================================================= */
+let fotoBlob = null;
+$('#btn-foto').addEventListener('click', async () => {
+  const flash = $('#flash'); flash.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => flash.classList.remove('on')));
+  tocar('foto');
+  const dpr = Math.min(2, devicePixelRatio || 1), cw = Math.round(innerWidth*dpr), ch = Math.round(innerHeight*dpr);
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+  const ctx = c.getContext('2d');
+
+  // fundo: imagem da câmera (mesmo recorte "cover" da tela)
+  if (video.videoWidth) {
+    const s = Math.max(cw/video.videoWidth, ch/video.videoHeight), dw = video.videoWidth*s, dh = video.videoHeight*s;
+    ctx.save();
+    if (estado.camera === 'user') { ctx.translate(cw, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(video, (cw-dw)/2, (ch-dh)/2, dw, dh);
+    ctx.restore();
+  } else {
+    const gr = ctx.createLinearGradient(0,0,0,ch); gr.addColorStop(0,'#8fd3ff'); gr.addColorStop(.55,'#c9f0ff'); gr.addColorStop(.56,'#8be08b'); gr.addColorStop(1,'#5cbf5c');
+    ctx.fillStyle = gr; ctx.fillRect(0,0,cw,ch);
+  }
+
+  // bichinhos na mesma ordem de camadas
+  const ordem = [...estado.pets].sort((a,b) => (+a.el.style.zIndex) - (+b.el.style.zIndex));
+  for (const p of ordem) {
+    const r = p.r; if (r.X === undefined) continue;
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.translate(r.X, r.Y); ctx.rotate(p.rot); ctx.scale(r.E, r.E);
+    // sombra
+    ctx.save(); ctx.scale(r.sombra * p.W*0.375, r.sombra * p.W*0.08);
+    const g = ctx.createRadialGradient(0,0,0, 0,0,1);
+    g.addColorStop(0,'rgba(0,0,0,.45)'); g.addColorStop(.64,'rgba(0,0,0,.18)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,1,0,Math.PI*2); ctx.fill(); ctx.restore();
+    // bichinho
+    ctx.translate(0, r.y); ctx.rotate(r.gira); ctx.scale(r.sx, r.sy);
+    ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = 6*dpr; ctx.shadowOffsetY = 4*dpr;
+    ctx.drawImage(p.img, -p.W/2, -p.H, p.W, p.H);
+    ctx.restore();
+  }
+
+  // selinho
+  ctx.font = `800 ${Math.round(22*dpr)}px "Baloo 2", sans-serif`;
+  ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.textAlign = 'right';
+  ctx.fillText('🐾 Meus Pets AR', cw - 16*dpr, ch - 16*dpr);
+
+  try {
+    fotoBlob = await new Promise((ok, erro) => c.toBlob(b => b ? ok(b) : erro(new Error('toBlob')), 'image/jpeg', 0.92));
+  } catch (e) {
+    mostrarBanner('Não foi possível gerar a foto. Abra a página por um link https:// para salvar fotos.');
+    return;
+  }
+  const url = URL.createObjectURL(fotoBlob);
+  $('#previa-img').src = url;
+  const arq = new File([fotoBlob], 'meus-pets.jpg', {type:'image/jpeg'});
+  $('#btn-compartilhar').hidden = !(navigator.canShare && navigator.canShare({files:[arq]}));
+  $('#previa').hidden = false;
+});
+$('#btn-salvar').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = $('#previa-img').src; a.download = `meus-pets-${Date.now()}.jpg`; a.click();
+});
+$('#btn-compartilhar').addEventListener('click', async () => {
+  try { await navigator.share({ files:[new File([fotoBlob], 'meus-pets.jpg', {type:'image/jpeg'})], title:'Meus Pets AR' }); } catch {}
+});
+$('#btn-fechar').addEventListener('click', () => { $('#previa').hidden = true; URL.revokeObjectURL($('#previa-img').src); });
+
+/* =========================================================
+   DICAS
+   ========================================================= */
+let timerDica;
+function mostrarDica(txt, ms=3000){
+  dica.textContent = txt; dica.classList.remove('some');
+  clearTimeout(timerDica); timerDica = setTimeout(() => dica.classList.add('some'), ms);
+}
+
+/* =========================================================
+   MODO AR 3D DE VERDADE (WebXR – Android com Chrome + ARCore)
+   Detecta o chão e "planta" o bichinho nele.
+   ========================================================= */
+async function verificarWebXR(){
+  try {
+    if (navigator.xr && await navigator.xr.isSessionSupported('immersive-ar')) $('#btn-xr').hidden = false;
+  } catch {}
+}
+$('#btn-xr').addEventListener('click', () => iniciarXR().catch(e => { console.error(e); mostrarBanner('Não foi possível abrir o modo AR 3D neste aparelho.'); iniciarCamera(estado.camera); }));
+
+async function iniciarXR(){
+  const THREE = await import('https://unpkg.com/three@0.160.0/build/three.module.js');
+  pararCamera();
+  const overlay = $('#xr-overlay'), xrDica = $('#xr-dica');
+  montarCarrossel($('#xr-carrossel'), p => { estado.petXR = p; xrDica.textContent = `Toque no chão para colocar o ${p.nome.toLowerCase()}! 👆`; });
+  $('#xr-carrossel .miniatura').classList.add('ativa'); estado.petXR = PETS[0];
+  overlay.querySelectorAll('.xr-ui').forEach(el => el.addEventListener('beforexrselect', e => e.preventDefault()));
+
+  const session = await navigator.xr.requestSession('immersive-ar', {
+    requiredFeatures:['hit-test'], optionalFeatures:['dom-overlay'], domOverlay:{ root: overlay }
+  });
+  overlay.hidden = false;
+
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(devicePixelRatio); renderer.setSize(innerWidth, innerHeight);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType('local');
+  await renderer.xr.setSession(session);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.01, 30);
+  const refSpace = renderer.xr.getReferenceSpace();
+  const viewerSpace = await session.requestReferenceSpace('viewer');
+  const hitSource = await session.requestHitTestSource({ space: viewerSpace });
+
+  // mira no chão
+  const mira = new THREE.Mesh(new THREE.RingGeometry(0.07, 0.09, 40).rotateX(-Math.PI/2), new THREE.MeshBasicMaterial({ color:0xff5d8f }));
+  mira.matrixAutoUpdate = false; mira.visible = false; scene.add(mira);
+
+  // textura de sombra
+  const sc = document.createElement('canvas'); sc.width = sc.height = 128;
+  const sctx = sc.getContext('2d'), sg = sctx.createRadialGradient(64,64,0,64,64,64);
+  sg.addColorStop(0,'rgba(0,0,0,.5)'); sg.addColorStop(1,'rgba(0,0,0,0)'); sctx.fillStyle = sg; sctx.fillRect(0,0,128,128);
+  const texSombra = new THREE.CanvasTexture(sc);
+
+  const loader = new THREE.TextureLoader(), cacheTex = {}, colocados = [];
+  const carregarTex = def => cacheTex[def.id] ??= new Promise(ok => loader.load(img(def), t => { t.colorSpace = THREE.SRGBColorSpace; ok(t); }));
+
+  async function colocar(def, matriz){
+    const tex = await carregarTex(def);
+    const h = 0.32, w = h * tex.image.width / tex.image.height;   // ~32 cm de altura
+    const grupo = new THREE.Group();
+    const corpo = new THREE.Mesh(new THREE.PlaneGeometry(w, h).translate(0, h/2, 0),
+      new THREE.MeshBasicMaterial({ map:tex, transparent:true, alphaTest:0.05, side:THREE.DoubleSide }));
+    const sombra = new THREE.Mesh(new THREE.PlaneGeometry(w*0.9, w*0.35).rotateX(-Math.PI/2),
+      new THREE.MeshBasicMaterial({ map:texSombra, transparent:true, depthWrite:false }));
+    sombra.position.y = 0.002;
+    grupo.add(sombra, corpo);
+    grupo.position.setFromMatrixPosition(matriz);
+    grupo.scale.setScalar(0.001);
+    scene.add(grupo);
+    const item = { def, grupo, corpo, h, nasceu:performance.now(), pulo:0, fase:Math.random()*10 };
+    corpo.userData.item = item;
+    colocados.push(item);
+    tocar('pop');
+  }
+
+  const raycaster = new THREE.Raycaster(), tmpQ = new THREE.Quaternion();
+  session.addEventListener('select', e => {
+    const pose = e.frame.getPose(e.inputSource.targetRaySpace, refSpace);
+    if (pose) {
+      const { position:p, orientation:o } = pose.transform;
+      raycaster.ray.origin.set(p.x, p.y, p.z);
+      raycaster.ray.direction.set(0,0,-1).applyQuaternion(tmpQ.set(o.x, o.y, o.z, o.w));
+      const hit = raycaster.intersectObjects(colocados.map(c => c.corpo))[0];
+      if (hit) { const it = hit.object.userData.item; it.pulo = performance.now(); tocar(it.def.tipo); return; }
+    }
+    if (mira.visible) { colocar(estado.petXR, mira.matrix); xrDica.textContent = 'Toque no bichinho para ele pular! Ou toque no chão para colocar mais 🐾'; }
+  });
+
+  $('#xr-sair').onclick = () => session.end();
+  session.addEventListener('end', () => {
+    renderer.setAnimationLoop(null); hitSource.cancel?.(); renderer.dispose();
+    overlay.hidden = true;
+    iniciarCamera(estado.camera);
+  });
+
+  renderer.setAnimationLoop((t, frame) => {
+    if (!frame) return;
+    const hits = frame.getHitTestResults(hitSource);
+    if (hits.length) {
+      const pose = hits[0].getPose(refSpace);
+      mira.visible = true; mira.matrix.fromArray(pose.transform.matrix);
+      if (!colocados.length) xrDica.textContent = `Achei o chão! Toque para colocar o ${estado.petXR.nome.toLowerCase()} 👆`;
+    } else mira.visible = false;
+
+    const vp = frame.getViewerPose(refSpace);
+    const cam = vp?.transform.position;
+    const agora = performance.now();
+    for (const it of colocados) {
+      const g = it.grupo;
+      if (cam) g.rotation.y = Math.atan2(cam.x - g.position.x, cam.z - g.position.z);   // sempre de frente para a criança
+      const dn = Math.min(1, (agora - it.nasceu)/500);
+      g.scale.setScalar(dn < 1 ? (1 - Math.pow(1-dn,3)) * (1 + Math.sin(dn*Math.PI)*0.3) : 1);
+      const tt = agora/1000 + it.fase;
+      it.corpo.scale.y = 1 + Math.sin(tt*2.4)*0.025;
+      const dp = (agora - it.pulo)/700;
+      it.corpo.position.y = dp >= 0 && dp < 1 ? Math.sin(Math.PI*dp) * it.h*0.5 : 0;
+      it.corpo.rotation.z = dp >= 0 && dp < 1 ? Math.sin(Math.PI*2*dp)*0.15 : 0;
+    }
+    renderer.render(scene, camera);
+  });
+}
+</script>
+</body>
+</html>

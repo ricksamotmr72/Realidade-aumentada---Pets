@@ -1,0 +1,13 @@
+{
+  "name": "Meus Pets em Realidade Aumentada",
+  "short_name": "Pets AR",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#3a86ff",
+  "theme_color": "#ff7a59",
+  "icons": [
+    { "src": "assets/icone.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
+
